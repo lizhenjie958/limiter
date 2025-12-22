@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit;
  * 核心概念：许可证数量，控制资源访问
  * 使用方式：new Semaphore(10) 表示最多允许10个线程同时执行
  * 并发控制：主要用于保护有限资源不被过度占用
- * 
+ *
  * @author ZhuPo
  * @date 2025/12/19 10:57
  */
