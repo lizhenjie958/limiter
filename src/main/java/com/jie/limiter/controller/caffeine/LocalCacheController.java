@@ -2,10 +2,13 @@ package com.jie.limiter.controller.caffeine;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.checkerframework.checker.nullness.qual.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,16 +40,25 @@ public class LocalCacheController {
                     // 设置最后一次写入后经过固定时间过期
                     .expireAfterWrite(10, TimeUnit.SECONDS)
                     .recordStats()
-            .maximumSize(10000)
-            .build();
+                    .maximumSize(10000)
+                    .removalListener(new RemovalListener<String, String>() {
+                        @Override
+                        public void onRemoval(@Nullable String s, @Nullable String s2, RemovalCause removalCause) {
+                            log.info("key:{},value:{},reason:{}",s,s2,removalCause);
+                        }
+                    })
+                    // 设置key为弱引用，默认是强引用
+                    .weakKeys()
+                    .build();
 
     // 方式2：访问后过期（适合会话数据）
     private static final Cache<String, String> CACHE_BY_ACCESS =
             Caffeine.newBuilder()
                     .expireAfterAccess(10, TimeUnit.SECONDS)
                     .recordStats()
-            .maximumSize(10000)
-            .build();
+                    .maximumSize(10000)
+                    .build();
+
 
 
 
@@ -56,12 +68,12 @@ public class LocalCacheController {
     @GetMapping("/getLongUrl")
     public String getLongUrl(@RequestParam("shortCode") String shortCode) {
         // 查询缓存
-        String cached = localUrlCache.getIfPresent(shortCode);
+        String cached = CACHE_BY_TIME.getIfPresent(shortCode);
         if (cached != null) return cached;
 
         // 未命中，查DB后回填
         String longUrl = queryDB(shortCode);
-        localUrlCache.put(shortCode, longUrl);
+        CACHE_BY_TIME.put(shortCode, longUrl);
         return longUrl;
     }
 
@@ -95,7 +107,7 @@ public class LocalCacheController {
     @PostConstruct
     public void warmupCache() {
         // 启动时预热Top热点数据
-        localUrlCache.put("123456", "https://www.baidu.com");
+        CACHE_BY_TIME.put("123456", "https://www.baidu.com");
     }
 
 }
